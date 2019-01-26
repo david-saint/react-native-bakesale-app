@@ -19,4 +19,13 @@ export default {
       return console.error(error);
     }
   },
+  async fetchDealsSearchResult(searchTerm) {
+    try {
+      const response = await fetch(`${API}/deals?searchTerm=${searchTerm}`);
+      const responseJson = await response.json();
+      return responseJson;
+    } catch (error) {
+      return console.error(error);
+    }
+  },
 };

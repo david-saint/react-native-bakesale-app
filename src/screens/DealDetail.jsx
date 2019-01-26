@@ -4,9 +4,14 @@ import {
   View,
   Text,
   Image,
+  Button,
+  Linking,
   Platform,
+  Animated,
   ScrollView,
   StyleSheet,
+  Dimensions,
+  PanResponder,
   TouchableOpacity,
 } from 'react-native';
 
@@ -20,7 +25,7 @@ const pt = Platform.select({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
+    backgroundColor: '#333',
     position: 'relative',
   },
   backContainer: {
@@ -43,6 +48,7 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     height: '7%',
     width: '100%',
+    backgroundColor: '#fff',
   },
   userInfo: {
     height: '100%',
@@ -85,6 +91,7 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderBottomWidth: 1,
     height: '48%',
+    backgroundColor: '#fff',
   },
   contentHead: {
     flexDirection: 'row',
@@ -123,7 +130,33 @@ class DealItem extends Component {
 
   state = {
     deal: this.props.initialDealData,
+    imageIndex: 0,
   };
+
+  imageXPos = new Animated.Value(0);
+
+  width = Dimensions.get('window').width;
+
+  imagePanResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onPanResponderMove: (evt, gst) => {
+      this.imageXPos.setValue(gst.dx);
+    },
+    onPanResponderRelease: (evt, gst) => {
+      // determine if the swipe has gone for more than 40% of the screen width
+      if (Math.abs(gst.dx) > this.width * 0.4) {
+        const direction = Math.sign(gst.dx); // -1 for left, and 1 for right
+        Animated.timing(this.imageXPos, {
+          toValue: direction * this.width,
+          duration: 250,
+        }).start(() => this.handleSwipe(direction));
+      } else {
+        Animated.spring(this.imageXPos, {
+          toValue: 0,
+        }).start();
+      }
+    },
+  });
 
   async componentDidMount() {
     const { deal } = this.state;
@@ -131,8 +164,33 @@ class DealItem extends Component {
     this.setState({ deal: fullDeal });
   }
 
-  render() {
+  openDealUrl = () => {
     const { deal } = this.state;
+    Linking.openURL(deal.url);
+  };
+
+  handleSwipe = (d) => {
+    const { imageIndex, deal } = this.state;
+    // If there's nothing to swipe to, return.
+    if (!deal.media[imageIndex - d]) {
+      Animated.spring(this.imageXPos, {
+        toValue: 0,
+      }).start();
+      return;
+    }
+    // swipe to next picture.
+    this.setState(prevState => ({
+      imageIndex: prevState.imageIndex - d,
+    }), () => {
+      this.imageXPos.setValue(this.width * d * -1);
+      Animated.spring(this.imageXPos, {
+        toValue: 0,
+      }).start();
+    });
+  };
+
+  render() {
+    const { deal, imageIndex } = this.state;
     const { onBack } = this.props;
 
     return (
@@ -144,9 +202,10 @@ class DealItem extends Component {
             <Text style={styles.backButton}>Back</Text>
           </TouchableOpacity>
         </View>
-        <Image
-          source={{ uri: deal.media[0] }}
-          style={styles.image}
+        <Animated.Image
+          {...this.imagePanResponder.panHandlers}
+          source={{ uri: deal.media[imageIndex] }}
+          style={[{ left: this.imageXPos }, styles.image]}
         />
         <View style={styles.info}>
           {deal.user && (
@@ -167,6 +226,7 @@ class DealItem extends Component {
             <Text style={styles.contentPrice}>{priceDisplay(deal.price)}</Text>
           </View>
           <Text style={styles.contentDescription}>{deal.description}</Text>
+          <Button title="Buy this deal!" onPress={this.openDealUrl} />
         </ScrollView>
       </View>
     );
